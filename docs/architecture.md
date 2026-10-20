@@ -37,18 +37,7 @@ flowchart LR
 - **Storage without a server.** Parquet files on a separate `data` branch. Power BI reads them through Power Query's Web connector, so there is no database to run or pay for.
 - **One container image everywhere.** Local Docker runs and CI use the official Playwright image at the same version as `@playwright/test`, so screenshots and browser behaviour match.
 
-## Planned data model
+## Data model
 
-Grain of `fact_test_result`: one test, on one browser project, in one CI run (final result after retries).
-
-| Table                  | Main columns                                                                                    |
-| ---------------------- | ----------------------------------------------------------------------------------------------- |
-| `fact_test_result`     | run, test, environment, release, date, failure category, status, is_flaky, retries, duration_ms |
-| `fact_run`             | run, release, date, trigger (push/pr/cron), shard count, wall clock, commit sha, run url        |
-| `dim_test`             | test id (hash of file + title), title, file, suite, type (ui/api/visual), tags, first seen      |
-| `dim_release`          | git tag, commit sha, release date, release order                                                |
-| `dim_date`             | date, week, month, weekday                                                                      |
-| `dim_environment`      | project (chromium/firefox/webkit/mobile-chrome/api), os, runner, image version                  |
-| `dim_failure_category` | category (timeout, assertion, locator, network, visual diff, other), normalized message         |
-
-Pass rate excludes skipped results: `passed / (passed + failed)`, where `flaky` counts as passed. The full model and measures will be documented in `docs/data-model.md` in phase 3.
+The star schema (two fact tables, seven dimensions), its grain, definitions and data
+quality checks are described in [data-model.md](data-model.md).

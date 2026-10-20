@@ -6,7 +6,7 @@
 
 A Playwright + TypeScript suite that runs in parallel on GitHub Actions, stores every run in a star schema, and turns it into a Power BI dashboard: flaky tests, duration trends, pass rate per release and failure patterns.
 
-> **Status:** phase 2 of 6 (test suite + CI) is done. The suite runs sharded in CI three times a day, and every run is published as an Allure report and kept as raw JSON/JUnit for the data pipeline. See the [roadmap](#roadmap).
+> **Status:** phase 3 of 6 (data pipeline) is done. Every CI run on `main` is added to a star schema of Parquet files on the [`data` branch](https://github.com/JordyR1986/powerbi-dashboard-playwright/tree/data), checked for data quality on the way. The Power BI dashboard comes next. See the [roadmap](#roadmap).
 
 ## Why this project
 
@@ -64,18 +64,21 @@ More detail and the design decisions are in [docs/architecture.md](docs/architec
 | Docker    | `Dockerfile` on the official Playwright image, pinned to the same version      |
 | CI        | Lint, 4 sharded test jobs in the Playwright image, merged reports, Pages, cron |
 | Reports   | Allure and Playwright HTML on GitHub Pages; JSON + JUnit kept as artifacts     |
+| Data      | DuckDB SQL builds a star schema with quality checks; Parquet + CSV on `data`   |
 
 ```text
 tests/ui            login, sorting, cart, checkout
 tests/api           auth, booking CRUD, contract checks
 tests/visual        screenshot comparison (baselines in __screenshots__)
 tests/demo          the labelled demo flaky test
+pipeline/           ingest, load (Zod), DuckDB build and SQL (staging, dims, facts, checks)
+scripts/            publish-data.sh: updates the data branch
 src/pages           page objects
 src/fixtures        shopper and API fixtures
 src/api             HTTP client and Zod schemas
 src/data            users, catalog, customer, booking builder
 src/support         checkout total rule
-docs/               architecture, CI pipeline, visual testing
+docs/               architecture, CI pipeline, visual testing, data model
 Dockerfile          test image on mcr.microsoft.com/playwright
 merge.config.ts     merges shard reports into HTML, JSON and JUnit
 allurerc.mjs        Allure 3 report, history and failure categories
@@ -99,6 +102,7 @@ npm run lint           # ESLint and Prettier
 npm run typecheck      # tsc --noEmit
 npm run report         # open the last HTML report
 npm run report:allure  # build and open an Allure report from allure-results/
+npm run test:pipeline  # unit tests for the data pipeline (no browser needed)
 ```
 
 The targets are public practice systems. Credentials in `.env.example` are the published demo accounts, not secrets. Copy it to `.env` only if you want to point the suite somewhere else.
@@ -116,7 +120,8 @@ The image uses the same Playwright version as `package.json`, so browsers and fo
 
 - **Allure report:** <https://jordyr1986.github.io/powerbi-dashboard-playwright/> with trends across runs and failure categories (visual, network, locator, timeout, assertion).
 - **Playwright HTML report:** <https://jordyr1986.github.io/powerbi-dashboard-playwright/playwright/>
-- **Raw results:** every CI run keeps a `raw-results` artifact for 90 days with `playwright-results.json`, `junit.xml` and `run-meta.json`. Phase 3 turns these into the star schema.
+- **Raw results:** every CI run keeps a `raw-results` artifact for 90 days with `playwright-results.json`, `junit.xml` and `run-meta.json`.
+- **Dataset:** the `data` branch holds every run on `main` and the star schema built from it, as Parquet and CSV. See [docs/data-model.md](docs/data-model.md).
 
 CI runs on every push and pull request, and at 05:23, 11:23 and 17:23 UTC every day. Tests run in four shards inside the official Playwright image, and the blob reports are merged into one report. Details: [docs/ci.md](docs/ci.md).
 
@@ -124,14 +129,28 @@ CI runs on every push and pull request, and at 05:23, 11:23 and 17:23 UTC every 
 
 `tests/demo/demo-flaky.spec.ts` is flaky **on purpose** and is tagged `@demo-flaky`. In CI it fails on about 30% of first attempts and always passes on the retry, so Playwright reports it as `flaky`. It gives the dashboard a known example of flakiness to show. It never fails locally, and you can leave it out with `--grep-invert @demo-flaky`.
 
+## Data pipeline
+
+```text
+raw-results → raw/<run_id>/ → staging (TypeScript + Zod) → DuckDB SQL → checks → Parquet/CSV
+```
+
+- **Two facts, seven dimensions:** `fact_test_result` (one test × project × run) and `fact_run`, with test, project, environment, release, commit, date and failure category.
+- **Releases from Git:** each run is labelled with the latest tag reachable from the commit it tested.
+- **Data quality gate:** 19 checks (unique grain, orphan keys, totals that match Playwright and JUnit, and more). One failure and nothing is written.
+- **Idempotent:** the model is rebuilt from the raw archive, so storing a run twice changes nothing; this is unit tested.
+- **Automatic:** the CI job _Update dataset_ adds every run on `main`; _Backfill dataset_ adds earlier runs from their artifacts.
+
+Details, ER diagram and metric definitions: [docs/data-model.md](docs/data-model.md).
+
 ## Roadmap
 
 | Phase              | Scope                                                                                                              | Status   |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------ | -------- |
 | 1. Setup           | New repo, suite carried over, Docker, lint and format, first green CI                                              | Done     |
 | 2. Test suite + CI | Visual tests in Docker, `@smoke`/`@regression` tags, sharded matrix, merged reports, Allure on Pages, cron, `v1.0` | Done     |
-| 3. Data pipeline   | JSON reporter, loader, DuckDB SQL to a star schema, data quality checks, Parquet on a `data` branch                | Next     |
-| 4. Power BI        | Power Query (M), semantic model and relationships, DAX measures, report pages, saved as PBIP/TMDL in Git           | Planned  |
+| 3. Data pipeline   | JSON reporter, loader, DuckDB SQL to a star schema, data quality checks, Parquet on a `data` branch                | Done     |
+| 4. Power BI        | Power Query (M), semantic model and relationships, DAX measures, report pages, saved as PBIP/TMDL in Git           | Next     |
 | 5. Presentation    | Dashboard screenshots, short demo video, case study                                                                | Planned  |
 | 6. Optional        | JMeter load test on Restful Booker, failure clustering in SQL, Microsoft Fabric Lakehouse variant                  | Optional |
 

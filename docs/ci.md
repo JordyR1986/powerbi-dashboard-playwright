@@ -14,6 +14,8 @@ flowchart LR
   R --> PW[Playwright HTML]
   R --> AL[Allure report]
   PW & AL --> P[GitHub Pages]
+  RAW --> D[Update dataset<br/>main only]
+  D --> DB[data branch<br/>raw + Parquet star schema]
 ```
 
 ## Triggers
@@ -32,7 +34,7 @@ activity; any push turns them back on.
 
 ## Jobs
 
-1. **Lint and typecheck.** ESLint, Prettier and `tsc --noEmit`.
+1. **Lint and typecheck.** ESLint, Prettier, `tsc --noEmit` and the pipeline unit tests.
 2. **Tests, 4 shards.** Every shard runs in the official Playwright image with
    `--shard=N/4`. Projects: `api`, `chromium`, `firefox`, `webkit`, `mobile-chrome`,
    `visual` and `demo`. CI retries a failed test twice, so a test that only passes on
@@ -44,7 +46,11 @@ activity; any push turns them back on.
    the trend history restored from the published site.
 4. **Publish to GitHub Pages.** Only from `main`. The Allure report is the home page,
    and the Playwright HTML report is under `/playwright/`.
-5. **Docker image builds.** Checks the `Dockerfile` on pushes and PRs (not on the schedule).
+5. **Update dataset.** Only from `main` (push, schedule, manual). Adds the run's
+   `raw-results` to the `data` branch and rebuilds the star schema with
+   `scripts/publish-data.sh`. Runs even when tests failed, because failures are data too.
+   See [data-model.md](data-model.md).
+6. **Docker image builds.** Checks the `Dockerfile` on pushes and PRs (not on the schedule).
 
 ## Artifacts
 
@@ -55,7 +61,15 @@ activity; any push turns them back on.
 | `blob-report-N`     | Per-shard blob report                                   | 3 days  |
 | `allure-results-N`  | Per-shard Allure results                                | 3 days  |
 
-`raw-results` is the input for the data pipeline in phase 3.
+`raw-results` is the input for the data pipeline. The `data` branch keeps every run
+permanently, so the 90-day artifact limit does not matter once a run is ingested.
+
+## Other workflows
+
+| Workflow               | Trigger | What it does                                                                  |
+| ---------------------- | ------- | ----------------------------------------------------------------------------- |
+| `visual-baselines.yml` | Manual  | Regenerates the screenshot baselines in the Playwright image and commits them |
+| `data-backfill.yml`    | Manual  | Adds earlier CI runs to the data branch from their `raw-results` artifacts    |
 
 ## Tags
 
@@ -73,5 +87,5 @@ Run a subset with `npm run test:smoke`, `npm run test:regression` or
 ## Cost
 
 Public repositories get GitHub Actions minutes for free. One run takes roughly
-6–8 runner minutes in total, so three scheduled runs a day stay well within
+7–9 runner minutes in total (the dataset update adds about one), so three scheduled runs a day stay well within
 sensible use.

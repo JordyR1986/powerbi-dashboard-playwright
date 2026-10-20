@@ -5,3 +5,9 @@ test-results
 playwright-report
 blob-report
 package-lock.json
+allure-results
+allure-report
+allure-history
+raw-results
+all-blob-reports
+site

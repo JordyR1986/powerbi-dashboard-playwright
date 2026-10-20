@@ -11,3 +11,9 @@ playwright/.auth/
 !.env.example
 *.log
 .DS_Store
+allure-results/
+allure-report/
+allure-history/
+raw-results/
+all-blob-reports/
+site/

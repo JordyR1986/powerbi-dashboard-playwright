@@ -6,3 +6,7 @@ blob-report
 .env
 .env.*
 !.env.example
+allure-results
+allure-report
+allure-history
+raw-results

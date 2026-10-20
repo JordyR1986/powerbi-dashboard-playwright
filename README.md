@@ -1,11 +1,12 @@
 # Power BI Dashboard for Playwright
 
 [![CI](https://github.com/JordyR1986/powerbi-dashboard-playwright/actions/workflows/ci.yml/badge.svg)](https://github.com/JordyR1986/powerbi-dashboard-playwright/actions/workflows/ci.yml)
+[![Allure report](https://img.shields.io/badge/report-Allure-orange.svg)](https://jordyr1986.github.io/powerbi-dashboard-playwright/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Playwright + TypeScript suite that runs in parallel on GitHub Actions, stores every run in a star schema, and turns it into a Power BI dashboard: flaky tests, duration trends, pass rate per release and failure patterns.
 
-> **Status:** phase 1 of 6 (setup) is done. The suite, tooling, Docker image and CI are in place. The data pipeline and the dashboard follow in later phases; see the [roadmap](#roadmap).
+> **Status:** phase 2 of 6 (test suite + CI) is done. The suite runs sharded in CI three times a day, and every run is published as an Allure report and kept as raw JSON/JUnit for the data pipeline. See the [roadmap](#roadmap).
 
 ## Why this project
 
@@ -54,26 +55,31 @@ More detail and the design decisions are in [docs/architecture.md](docs/architec
 
 ## What is in the repo today
 
-| Area      | Contents                                                                           |
-| --------- | ---------------------------------------------------------------------------------- |
-| UI tests  | Sauce Demo: login, sorting, cart, checkout (Page Object Model, fixtures)           |
-| API tests | Restful Booker: auth, booking CRUD, contract checks with Zod                       |
-| Browsers  | Chromium, Firefox, WebKit and a Pixel 5 viewport                                   |
-| Tooling   | TypeScript (strict), ESLint with Playwright rules, Prettier, EditorConfig          |
-| Docker    | `Dockerfile` on the official Playwright image, pinned to the same version          |
-| CI        | GitHub Actions: lint and typecheck, tests in the Playwright container, image build |
+| Area      | Contents                                                                       |
+| --------- | ------------------------------------------------------------------------------ |
+| UI tests  | Sauce Demo: login, sorting, cart, checkout (Page Object Model, fixtures)       |
+| API tests | Restful Booker: auth, booking CRUD, contract checks with Zod                   |
+| Browsers  | Chromium, Firefox, WebKit and a Pixel 5 viewport                               |
+| Tooling   | TypeScript (strict), ESLint with Playwright rules, Prettier, EditorConfig      |
+| Docker    | `Dockerfile` on the official Playwright image, pinned to the same version      |
+| CI        | Lint, 4 sharded test jobs in the Playwright image, merged reports, Pages, cron |
+| Reports   | Allure and Playwright HTML on GitHub Pages; JSON + JUnit kept as artifacts     |
 
 ```text
 tests/ui            login, sorting, cart, checkout
 tests/api           auth, booking CRUD, contract checks
+tests/visual        screenshot comparison (baselines in __screenshots__)
+tests/demo          the labelled demo flaky test
 src/pages           page objects
 src/fixtures        shopper and API fixtures
 src/api             HTTP client and Zod schemas
 src/data            users, catalog, customer, booking builder
 src/support         checkout total rule
-docs/               architecture and design decisions
+docs/               architecture, CI pipeline, visual testing
 Dockerfile          test image on mcr.microsoft.com/playwright
-.github/workflows   CI
+merge.config.ts     merges shard reports into HTML, JSON and JUnit
+allurerc.mjs        Allure 3 report, history and failure categories
+.github/workflows   CI and the visual baseline update
 ```
 
 ## Run locally
@@ -83,12 +89,16 @@ Requires Node.js 22.
 ```bash
 npm ci
 npx playwright install --with-deps
-npm test               # API once, UI on Chromium, Firefox, WebKit and mobile Chrome
+npm test               # everything: API, UI on four browsers, visual, demo
+npm run test:smoke     # only @smoke
+npm run test:regression
 npm run test:api       # API only, no browser needed
+npm run test:visual    # visual project (screenshots are compared in CI and Docker only)
 npm run test:chromium  # API + Chromium, the quickest full check
 npm run lint           # ESLint and Prettier
 npm run typecheck      # tsc --noEmit
 npm run report         # open the last HTML report
+npm run report:allure  # build and open an Allure report from allure-results/
 ```
 
 The targets are public practice systems. Credentials in `.env.example` are the published demo accounts, not secrets. Copy it to `.env` only if you want to point the suite somewhere else.
@@ -100,15 +110,27 @@ npm run docker:build
 npm run docker:test    # writes playwright-report/ and test-results/ to your machine
 ```
 
-The image uses the same Playwright version as `package.json`, so browsers and fonts are identical locally and in CI. That matters for the visual tests in the next phase.
+The image uses the same Playwright version as `package.json`, so browsers and fonts are identical locally and in CI. That is what keeps the visual baselines reliable; see [docs/visual-testing.md](docs/visual-testing.md).
+
+## Reports and CI
+
+- **Allure report:** <https://jordyr1986.github.io/powerbi-dashboard-playwright/> with trends across runs and failure categories (visual, network, locator, timeout, assertion).
+- **Playwright HTML report:** <https://jordyr1986.github.io/powerbi-dashboard-playwright/playwright/>
+- **Raw results:** every CI run keeps a `raw-results` artifact for 90 days with `playwright-results.json`, `junit.xml` and `run-meta.json`. Phase 3 turns these into the star schema.
+
+CI runs on every push and pull request, and at 05:23, 11:23 and 17:23 UTC every day. Tests run in four shards inside the official Playwright image, and the blob reports are merged into one report. Details: [docs/ci.md](docs/ci.md).
+
+### The demo flaky test
+
+`tests/demo/demo-flaky.spec.ts` is flaky **on purpose** and is tagged `@demo-flaky`. In CI it fails on about 30% of first attempts and always passes on the retry, so Playwright reports it as `flaky`. It gives the dashboard a known example of flakiness to show. It never fails locally, and you can leave it out with `--grep-invert @demo-flaky`.
 
 ## Roadmap
 
 | Phase              | Scope                                                                                                              | Status   |
 | ------------------ | ------------------------------------------------------------------------------------------------------------------ | -------- |
 | 1. Setup           | New repo, suite carried over, Docker, lint and format, first green CI                                              | Done     |
-| 2. Test suite + CI | Visual tests in Docker, `@smoke`/`@regression` tags, sharded matrix, merged reports, Allure on Pages, cron, `v1.0` | Next     |
-| 3. Data pipeline   | JSON reporter, loader, DuckDB SQL to a star schema, data quality checks, Parquet on a `data` branch                | Planned  |
+| 2. Test suite + CI | Visual tests in Docker, `@smoke`/`@regression` tags, sharded matrix, merged reports, Allure on Pages, cron, `v1.0` | Done     |
+| 3. Data pipeline   | JSON reporter, loader, DuckDB SQL to a star schema, data quality checks, Parquet on a `data` branch                | Next     |
 | 4. Power BI        | Power Query (M), semantic model and relationships, DAX measures, report pages, saved as PBIP/TMDL in Git           | Planned  |
 | 5. Presentation    | Dashboard screenshots, short demo video, case study                                                                | Planned  |
 | 6. Optional        | JMeter load test on Restful Booker, failure clustering in SQL, Microsoft Fabric Lakehouse variant                  | Optional |
@@ -117,6 +139,7 @@ The image uses the same Playwright version as `package.json`, so browsers and fo
 
 - **Risk first.** Each test protects a decision a user or a client system can get wrong.
 - **Pyramid.** API tests carry the data rules (status codes, auth, payload shape). UI tests cover what only a browser can show.
+- **Smoke first.** `@smoke` marks the handful of checks that decide whether the shop and the API are usable at all; `@regression` is everything else.
 - **No hidden flakiness.** Local runs do not retry. CI retries twice, and Playwright marks a test that only passed on retry as `flaky`. That status is what the dashboard will measure.
 - **Nothing skipped.** `playwright/no-skipped-test` is an error and CI sets `forbidOnly`.
 - **Evidence on failure.** Trace, screenshot and video are kept when a test fails.

@@ -4,7 +4,7 @@ import { env } from '../../src/config/env';
 import { expect, test } from '../../src/fixtures/api.fixture';
 
 test.describe('Auth token', { tag: '@api' }, () => {
-  test('issues a token for valid credentials', async ({ bookingClient }) => {
+  test('issues a token for valid credentials', { tag: '@smoke' }, async ({ bookingClient }) => {
     const response = await bookingClient.authenticate(env.apiUsername, env.apiPassword);
 
     expect(response.status()).toBe(200);
@@ -12,11 +12,15 @@ test.describe('Auth token', { tag: '@api' }, () => {
     expect(body.token.length).toBeGreaterThan(0);
   });
 
-  test('returns the published failure contract for bad credentials', async ({ bookingClient }) => {
-    // Restful Booker answers a failed login with HTTP 200 and a reason field.
-    const response = await bookingClient.authenticate(env.apiUsername, 'wrong-password');
+  test(
+    'returns the published failure contract for bad credentials',
+    { tag: '@regression' },
+    async ({ bookingClient }) => {
+      // Restful Booker answers a failed login with HTTP 200 and a reason field.
+      const response = await bookingClient.authenticate(env.apiUsername, 'wrong-password');
 
-    expect(response.status()).toBe(200);
-    parseContract(authFailureSchema, await readJson(response), 'Auth failure');
-  });
+      expect(response.status()).toBe(200);
+      parseContract(authFailureSchema, await readJson(response), 'Auth failure');
+    },
+  );
 });

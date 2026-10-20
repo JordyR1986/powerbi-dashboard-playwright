@@ -6,18 +6,19 @@ test.describe('Login', { tag: '@ui' }, () => {
     await loginPage.open();
   });
 
-  test('signs in a standard shopper and opens the inventory', async ({
-    loginPage,
-    inventoryPage,
-  }) => {
-    await loginPage.signIn(users.standard.username, users.standard.password);
+  test(
+    'signs in a standard shopper and opens the inventory',
+    { tag: '@smoke' },
+    async ({ loginPage, inventoryPage }) => {
+      await loginPage.signIn(users.standard.username, users.standard.password);
 
-    await inventoryPage.waitUntilReady();
-    await expect(inventoryPage.title).toHaveText('Products');
-    await expect(inventoryPage.itemNames).not.toHaveCount(0);
-  });
+      await inventoryPage.waitUntilReady();
+      await expect(inventoryPage.title).toHaveText('Products');
+      await expect(inventoryPage.itemNames).not.toHaveCount(0);
+    },
+  );
 
-  test('rejects unknown credentials', async ({ page, loginPage }) => {
+  test('rejects unknown credentials', { tag: '@regression' }, async ({ page, loginPage }) => {
     await loginPage.signIn(users.invalid.username, users.invalid.password);
 
     await expect(loginPage.error).toContainText(loginErrors.mismatch);
@@ -25,14 +26,14 @@ test.describe('Login', { tag: '@ui' }, () => {
     await expect(loginPage.username).toBeVisible();
   });
 
-  test('blocks a locked account', async ({ page, loginPage }) => {
+  test('blocks a locked account', { tag: '@regression' }, async ({ page, loginPage }) => {
     await loginPage.signIn(users.lockedOut.username, users.lockedOut.password);
 
     await expect(loginPage.error).toContainText(loginErrors.lockedOut);
     await expect(page).toHaveURL(/\/$/);
   });
 
-  test('requires a username', async ({ loginPage }) => {
+  test('requires a username', { tag: '@regression' }, async ({ loginPage }) => {
     await loginPage.signIn('', users.standard.password);
 
     await expect(loginPage.error).toContainText(loginErrors.usernameRequired);

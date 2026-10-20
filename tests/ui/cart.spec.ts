@@ -2,7 +2,7 @@ import { catalog } from '../../src/data/catalog';
 import { expect, test } from '../../src/fixtures/ui.fixture';
 
 test.describe('Cart', { tag: '@ui' }, () => {
-  test('adds two products and removes one', async ({ shopper }) => {
+  test('adds two products and removes one', { tag: '@smoke' }, async ({ shopper }) => {
     const selected = [catalog.backpack, catalog.bikeLight];
 
     for (const item of selected) {

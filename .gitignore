@@ -17,3 +17,5 @@ allure-history/
 raw-results/
 all-blob-reports/
 site/
+.data-branch
+.data/

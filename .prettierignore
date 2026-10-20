@@ -11,3 +11,6 @@ allure-history
 raw-results
 all-blob-reports
 site
+.data-branch
+pipeline/tests/fixtures
+.data

@@ -4,24 +4,28 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Three runs a day (UTC) so the dashboard gets a steady stream of real results.
+  schedule:
+    - cron: '23 5,11,17 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  # Only pull requests cancel older runs; every run on main is kept as data.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
     name: Lint and typecheck
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -36,18 +40,24 @@ jobs:
         run: npm run typecheck
 
   test:
-    name: Tests (Playwright image)
+    name: Tests (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     needs: lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    # Official Playwright image: the same browsers and fonts as the Dockerfile.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Same image and version as the Dockerfile, so screenshots match the baselines.
     container:
       image: mcr.microsoft.com/playwright:v1.64.1-noble
       options: --ipc=host
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      HOME: /root
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -56,26 +66,151 @@ jobs:
         run: npm ci
 
       - name: Run tests
-        run: npx playwright test
-        env:
-          HOME: /root
+        run: npx playwright test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
-      - name: Upload Playwright report
+      - name: Upload blob report
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 3
+          if-no-files-found: error
+
+      - name: Upload Allure results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: allure-results-${{ matrix.shard }}
+          path: allure-results/
+          retention-days: 3
+          if-no-files-found: warn
+
+  report:
+    name: Merge reports
+    needs: test
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download blob reports
+        uses: actions/download-artifact@v8
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+
+      - name: Merge into HTML, JSON and JUnit
+        run: npx playwright merge-reports --config merge.config.ts ./all-blob-reports
+
+      - name: Write run metadata
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: |
+          jq -n \
+            --arg run_id "$GITHUB_RUN_ID" \
+            --arg run_attempt "$GITHUB_RUN_ATTEMPT" \
+            --arg run_number "$GITHUB_RUN_NUMBER" \
+            --arg event "$GITHUB_EVENT_NAME" \
+            --arg ref "$GITHUB_REF" \
+            --arg sha "$GITHUB_SHA" \
+            --arg run_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --arg result "$TEST_RESULT" \
+            --arg playwright "$(npx playwright --version | awk '{print $2}')" \
+            --arg image "mcr.microsoft.com/playwright:v1.64.1-noble" \
+            --arg merged_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --argjson shard_count 4 \
+            '$ARGS.named' > raw-results/run-meta.json
+          cat raw-results/run-meta.json
+
+      - name: Upload raw results
+        uses: actions/upload-artifact@v7
+        with:
+          name: raw-results
+          path: raw-results/
+          retention-days: 90
+
+      - name: Upload Playwright HTML report
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: playwright-report/
           retention-days: 14
-          if-no-files-found: warn
+
+      - name: Download Allure results
+        uses: actions/download-artifact@v8
+        with:
+          pattern: allure-results-*
+          path: allure-results
+          merge-multiple: true
+
+      - name: Restore Allure history from GitHub Pages
+        run: |
+          mkdir -p allure-history
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          repo="${GITHUB_REPOSITORY#*/}"
+          url="https://${owner}.github.io/${repo}/history/history.jsonl"
+          if curl -fsSL "$url" -o allure-history/history.jsonl; then
+            echo "Restored $(wc -l < allure-history/history.jsonl) history entries"
+          else
+            rm -f allure-history/history.jsonl
+            echo "No published history yet, starting fresh"
+          fi
+
+      - name: Generate Allure report
+        run: npx allure generate allure-results --config allurerc.mjs
+
+      - name: Assemble site
+        run: |
+          mkdir -p site/history
+          cp -r allure-report/. site/
+          cp -r playwright-report site/playwright
+          if [ -f allure-history/history.jsonl ]; then cp allure-history/history.jsonl site/history/; fi
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: report
+    if: ${{ !cancelled() && needs.report.result == 'success' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5
 
   docker:
     name: Docker image builds
     needs: lint
-    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Build image
         run: docker build -t powerbi-dashboard-playwright .

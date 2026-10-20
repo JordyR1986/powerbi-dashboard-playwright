@@ -1,0 +1,89 @@
+name: Update visual baselines
+
+# Run this by hand (Actions > Update visual baselines > Run workflow) after a
+# deliberate UI change, or once to create the first baselines. Screenshots are
+# taken in the same Playwright image as CI, then committed to the chosen branch.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-baselines-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    name: Generate baselines
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble
+      options: --ipc=host
+    env:
+      HOME: /root
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update screenshots
+        run: npx playwright test --project=visual --update-snapshots=all --retries=0 --reporter=list
+
+      - name: Check the new baselines pass twice
+        run: npx playwright test --project=visual --retries=0 --repeat-each=2 --reporter=list
+
+      - name: Upload baselines
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-baselines
+          path: tests/visual/__screenshots__/
+          retention-days: 14
+          if-no-files-found: error
+
+  commit:
+    name: Commit baselines
+    needs: generate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download baselines
+        uses: actions/download-artifact@v8
+        with:
+          name: visual-baselines
+          path: tests/visual/__screenshots__/
+
+      - name: Commit and push if changed
+        id: commit
+        run: |
+          git config user.name "JordyR1986"
+          git config user.email "195427682+JordyR1986@users.noreply.github.com"
+          git add tests/visual/__screenshots__
+          if git diff --cached --quiet; then
+            echo "Baselines unchanged, nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "test: update visual baselines"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Pushes made with GITHUB_TOKEN do not start other workflows, so start CI explicitly.
+      - name: Start CI on the new commit
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --ref "$GITHUB_REF_NAME"

@@ -1,0 +1,55 @@
+name: Backfill dataset
+
+# Adds earlier CI runs to the data branch from their raw-results artifacts (kept 90 days).
+# Runs that are already in the data branch are simply stored again, so this is safe to repeat.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: How many recent CI runs on main to look at
+        default: '100'
+        required: true
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  backfill:
+    name: Backfill from artifacts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download raw results of earlier runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          mkdir -p incoming
+          gh run list --workflow ci.yml --branch main --status completed --limit "$LIMIT" \
+            --json databaseId,event --jq '.[] | select(.event != "pull_request") | .databaseId' > runs.txt
+          while read -r id; do
+            if gh run download "$id" --name raw-results --dir "incoming/$id" 2>/dev/null; then
+              echo "run $id: downloaded"
+            else
+              echo "run $id: no raw-results artifact (older than phase 2 or expired)"
+            fi
+          done < runs.txt
+          echo "found=$(find incoming -name run-meta.json | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+        id: download
+
+      - name: Add the runs to the data branch
+        if: steps.download.outputs.found != '0'
+        run: bash scripts/publish-data.sh incoming/*

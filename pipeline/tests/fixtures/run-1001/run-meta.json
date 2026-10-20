@@ -1,0 +1,14 @@
+{
+  "run_id": "1001",
+  "run_attempt": "1",
+  "run_number": "7",
+  "event": "schedule",
+  "ref": "refs/heads/main",
+  "sha": "0fc3f5df24a62f1ff2bc6b9aa30095c8e1ffaa83",
+  "run_url": "https://github.com/JordyR1986/powerbi-dashboard-playwright/actions/runs/1001",
+  "result": "success",
+  "playwright": "1.64.1",
+  "image": "mcr.microsoft.com/playwright:v1.64.1-noble",
+  "merged_at": "2026-10-21T05:23:10.000Z",
+  "shard_count": 4
+}

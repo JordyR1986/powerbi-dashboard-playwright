@@ -1,0 +1,268 @@
+{
+ "config": {},
+ "suites": [
+  {
+   "title": "api/auth.spec.ts",
+   "file": "api/auth.spec.ts",
+   "specs": [],
+   "suites": [
+    {
+     "title": "Auth token",
+     "file": "api/auth.spec.ts",
+     "specs": [
+      {
+       "title": "issues a token",
+       "file": "api/auth.spec.ts",
+       "tags": [
+        "api",
+        "smoke"
+       ],
+       "tests": [
+        {
+         "projectName": "api",
+         "expectedStatus": "passed",
+         "status": "expected",
+         "results": [
+          {
+           "retry": 0,
+           "status": "passed",
+           "duration": 210,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": []
+          }
+         ],
+         "annotations": [],
+         "timeout": 45000
+        }
+       ],
+       "ok": true,
+       "id": "x",
+       "line": 1,
+       "column": 1
+      },
+      {
+       "title": "rejects bad credentials",
+       "file": "api/auth.spec.ts",
+       "tags": [
+        "api",
+        "regression"
+       ],
+       "tests": [
+        {
+         "projectName": "api",
+         "expectedStatus": "passed",
+         "status": "unexpected",
+         "results": [
+          {
+           "retry": 0,
+           "status": "failed",
+           "duration": 300,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": [
+            {
+             "message": "Error: expect(received).toBe(expected)\n\nExpected: 200\nReceived: 503"
+            }
+           ],
+           "error": {
+            "message": "Error: expect(received).toBe(expected)\n\nExpected: 200\nReceived: 503"
+           }
+          },
+          {
+           "retry": 1,
+           "status": "failed",
+           "duration": 300,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": [
+            {
+             "message": "Error: expect(received).toBe(expected)\n\nExpected: 200\nReceived: 503"
+            }
+           ],
+           "error": {
+            "message": "Error: expect(received).toBe(expected)\n\nExpected: 200\nReceived: 503"
+           }
+          },
+          {
+           "retry": 2,
+           "status": "failed",
+           "duration": 300,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": [
+            {
+             "message": "Error: expect(received).toBe(expected)\n\nExpected: 200\nReceived: 503"
+            }
+           ],
+           "error": {
+            "message": "Error: expect(received).toBe(expected)\n\nExpected: 200\nReceived: 503"
+           }
+          }
+         ],
+         "annotations": [],
+         "timeout": 45000
+        }
+       ],
+       "ok": true,
+       "id": "x",
+       "line": 1,
+       "column": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "ui/login.spec.ts",
+   "file": "ui/login.spec.ts",
+   "specs": [],
+   "suites": [
+    {
+     "title": "Login",
+     "file": "ui/login.spec.ts",
+     "specs": [
+      {
+       "title": "signs in",
+       "file": "ui/login.spec.ts",
+       "tags": [
+        "smoke",
+        "ui"
+       ],
+       "tests": [
+        {
+         "projectName": "chromium",
+         "expectedStatus": "passed",
+         "status": "expected",
+         "results": [
+          {
+           "retry": 0,
+           "status": "passed",
+           "duration": 900,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": []
+          }
+         ],
+         "annotations": [],
+         "timeout": 45000
+        },
+        {
+         "projectName": "firefox",
+         "expectedStatus": "passed",
+         "status": "flaky",
+         "results": [
+          {
+           "retry": 0,
+           "status": "timedOut",
+           "duration": 45000,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": [
+            {
+             "message": "\u001b[31mTest timeout of 45000ms exceeded.\u001b[39m"
+            }
+           ],
+           "error": {
+            "message": "\u001b[31mTest timeout of 45000ms exceeded.\u001b[39m"
+           }
+          },
+          {
+           "retry": 1,
+           "status": "passed",
+           "duration": 1200,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": []
+          }
+         ],
+         "annotations": [],
+         "timeout": 45000
+        }
+       ],
+       "ok": true,
+       "id": "x",
+       "line": 1,
+       "column": 1
+      },
+      {
+       "title": "remembers the user",
+       "file": "ui/login.spec.ts",
+       "tags": [
+        "regression",
+        "ui"
+       ],
+       "tests": [
+        {
+         "projectName": "chromium",
+         "expectedStatus": "skipped",
+         "status": "skipped",
+         "results": [
+          {
+           "retry": 0,
+           "status": "skipped",
+           "duration": 0,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": []
+          }
+         ],
+         "annotations": [],
+         "timeout": 45000
+        }
+       ],
+       "ok": true,
+       "id": "x",
+       "line": 1,
+       "column": 1
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "title": "visual/pages.spec.ts",
+   "file": "visual/pages.spec.ts",
+   "specs": [],
+   "suites": [
+    {
+     "title": "Visual",
+     "file": "visual/pages.spec.ts",
+     "specs": [
+      {
+       "title": "login page",
+       "file": "visual/pages.spec.ts",
+       "tags": [
+        "regression",
+        "visual"
+       ],
+       "tests": [
+        {
+         "projectName": "visual",
+         "expectedStatus": "passed",
+         "status": "expected",
+         "results": [
+          {
+           "retry": 0,
+           "status": "passed",
+           "duration": 700,
+           "startTime": "2026-10-22T05:23:10.000Z",
+           "errors": []
+          }
+         ],
+         "annotations": [],
+         "timeout": 45000
+        }
+       ],
+       "ok": true,
+       "id": "x",
+       "line": 1,
+       "column": 1
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "errors": [],
+ "stats": {
+  "startTime": "2026-10-22T05:23:10.000Z",
+  "duration": 61000.5,
+  "expected": 3,
+  "unexpected": 1,
+  "flaky": 1,
+  "skipped": 1
+ }
+}

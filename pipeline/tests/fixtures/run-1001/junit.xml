@@ -1,0 +1,8 @@
+<testsuites>
+<testcase name="t0" classname="c" time="1"></testcase>
+<testcase name="t1" classname="c" time="1"></testcase>
+<testcase name="t2" classname="c" time="1"></testcase>
+<testcase name="t3" classname="c" time="1"></testcase>
+<testcase name="t4" classname="c" time="1"></testcase>
+<testcase name="t5" classname="c" time="1"></testcase>
+</testsuites>
